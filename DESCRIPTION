@@ -1,0 +1,15 @@
+Package: Tcells2
+Type: Package
+Title: Fits Tcell dynamic models with mixed models and STAN
+Version: 1.0
+Date: 2015-09-06
+Author: Georges Monette +?
+ Maintainer: Georges Monette <georges@yorku.ca>
+Description: Enhancements to nlme and rstan to fit Tcell dynamic models
+License: GPL
+Depends: nlme
+Suggests: knitr,
+	rmarkdown,
+	magrittr,
+VignetteBuilder: knitr
+LazyData: yes
