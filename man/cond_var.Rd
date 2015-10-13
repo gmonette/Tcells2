@@ -2,9 +2,13 @@
 % Please edit documentation in R/means_variances.R
 \name{cond_var}
 \alias{cond_var}
+\alias{cond_var_k}
 \title{Conditional variance}
 \usage{
 cond_var(Y, lambda = parms$lambda, birth = parms$birth,
+  death = parms$death, tran = parms$tran, parms, verbose = FALSE)
+
+cond_var_k(k, Y, lambda = parms$lambda, birth = parms$birth,
   death = parms$death, tran = parms$tran, parms, verbose = FALSE)
 }
 \arguments{
@@ -21,6 +25,8 @@ cond_var(Y, lambda = parms$lambda, birth = parms$birth,
 \item{parms}{option list with parameters lambda, birth, death and tran}
 
 \item{verbose}{(default FALSE) print additional output for debugging}
+
+\item{k}{number of steps for conditional variance}
 }
 \value{
 conditional expectation at time t+1
@@ -28,6 +34,10 @@ conditional expectation at time t+1
 \description{
 Conditional variance
 }
+\section{Functions}{
+\itemize{
+\item \code{cond_var_k}: Conditional variance in k steps of the process
+}}
 \examples{
 parms <- list(lambda = 10, birth = rep(.01,3),
               death = .03, tran = c(.01,.02))

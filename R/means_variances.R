@@ -1,4 +1,3 @@
-
 #' Display value of an expression
 #' 
 #' Display value of an expression for debugging
@@ -9,6 +8,25 @@ disp <- function (x)
 {
   cat("\n::: ", deparse(substitute(x)), " :::\n")
   print(x)
+}
+#' L matrix as function of parameters
+#' 
+#' @param birth vector for each type of cell with proportions of cells that replicate per unit of time
+#' @param death vector for each type of cell with proportions of cells that die per unit of time
+#' @param tran vector of length equal to length(Y) -1 with proportions of cells that transform to the next cell type per unit of time
+#' @param parms option list with parameters lambda, birth, death and tran
+#' @param verbose (default FALSE) print additional output for debugging
+#'
+#' The 'L' matrix is a lower triangular matrix that provides the linear
+#' portion of expectation at time $t$ into expectation at time $t+1$
+#'
+#' @export
+Lexp <- function(birth = parms$birth, death = parms$death, tran = parms$tran, parms){
+  # assume the correct length for each parameter
+  theta <- death + c(tran,0) - birth
+  ret <- diag( 1 - theta)
+  for( i in 2:length(birth)) ret[i,i-1] <- tran[i-1]
+  ret
 }
 #' Equilibrium expected value -- single cell type.
 #' 
@@ -116,7 +134,67 @@ cond_ev <- function(Y, lambda = parms$lambda,
   if(N == 1) return( lambda + L * Y)
   c(lambda,rep(0,N-1)) + L %*% Y
 }
-#' Mariginaal (equilibrium) expectation of process
+
+# Conditional Expectation in k steps ------------------------------------------
+
+#' @describeIn cond_ev Conditional expectation in k steps of the process
+#' @param k number of steps for conditional expectation
+#' @export
+cond_ev_k <- function(k,    # conditional expectation in k steps 
+                      Y, lambda = parms$lambda, 
+                      birth = parms$birth, 
+                      death = parms$death,
+                      tran = parms$tran,
+                      parms, # optional way of providing parameters
+                      verbose = FALSE){
+  # Returns: E( Y_{t+1} | Y_t)
+  N <- length(Y)
+  # birth, death and trans can be entered as single value
+  birth <- rep(birth, length.out = N)
+  death <- rep(death, length.out = N)
+  if (N > 1) tran <- rep(tran, length.out = N-1)
+  # net death rate
+  theta <- numeric(N)
+  if(N == 1) theta[1] <- death[1] - birth[1] 
+  if(N > 1) {
+    theta[1] <- death[1] - birth[1] + tran[1] 
+    if (N > 2) {
+      for (i in 2:(N-1)) theta[i] <- 
+          death[i] + tran[i] - birth[i]
+    }
+    theta[N] <- death[N] - birth[N]
+  }
+  if(verbose) {
+    disp(lambda)
+    disp(birth)
+    disp(death)
+    disp(tran)
+    disp(theta)
+  }
+  if(N == 1) L <- 1 - theta[1] else {
+    L <- diag(1 - theta)
+    L[row(L)==(col(L)+1)] <- tran
+  }
+  if(verbose) disp(L)
+  if(k == 0) return(Y)
+  if(k == 1){
+    if(N == 1) return( lambda + L * Y)
+    return(c(lambda,rep(0,N-1)) + L %*% Y)
+  }
+  Lsum <- diag(N)
+  Lk <- L
+  for (i in 2:k){
+    Lsum <- Lsum + Lk
+    Lk <- L %*% Lk
+  }
+  if(verbose) disp(Lk)
+  if(verbose) disp(Lsum)
+  Lk %*% Y + lambda * Lsum[,1] 
+}
+
+
+
+#' Marginal (equilibrium) expectation of process
 #' 
 #' @param lambda autonomous rate of cell formation for first cell type per unit of time
 #' @param birth vector for each type of cell with proportions of cells that replicate per unit of time
@@ -160,6 +238,8 @@ marg_ev <- function(lambda = parms$lambda,
     }
     theta[N] <- death[N] - birth[N]
   }
+  if(verbose) disp(theta)
+  if( any( theta <= 0)) warning("Non-convergent solution due to negative theta")
   ret <- numeric(N)
   ret[1] <- lambda / theta[1]
   if ( N > 1) for ( i in 2:N) ret[i] <- 
@@ -214,6 +294,111 @@ cond_var <- function(Y,
   if(verbose) disp(L)
   L %*% ( D * t(L))
 }
+
+# Conditional Variance in k steps ------------------------------------------
+
+#' @describeIn cond_var Conditional variance in k steps of the process
+#' @param k number of steps for conditional variance
+#' @export
+cond_var_k <- function(k,
+                       Y, 
+                       lambda = parms$lambda, 
+                       birth = parms$birth, 
+                       death = parms$death,
+                       tran = parms$tran,
+                       parms, # optional way of providing parameters
+                       verbose = FALSE) {
+  
+  NA # for now -- not needed for marginal model
+}
+#' Conditional expectation and variance in k steps
+#' 
+#' @param k number of steps into the future for conditional expectation and variance
+#' @param Y vector of cell counts at time t
+#' @param lambda autonomous rate of cell formation for first cell type per unit of time
+#' @param birth vector for each type of cell with proportions of cells that replicate per unit of time
+#' @param death vector for each type of cell with proportions of cells that die per unit of time
+#' @param tran vector of length equal to length(Y) -1 with proportions of cells that transform to the next cell type per unit of time
+#' @param parms option list with parameters lambda, birth, death and tran
+#' @param verbose (default FALSE) print additional output for debugging
+#' @return conditional expectation at time t+k
+#' @export
+# cond_k ---------------------------------------------------------------------------------------------
+cond_k <- function(
+    k,
+    Y, 
+    lambda = parms$lambda, 
+    birth = parms$birth, 
+    death = parms$death,
+    tran = parms$tran,
+    parms, # optional way of providing parameters
+    verbose = FALSE) {
+  Avec <- function(birth,death,tran) {
+    # returns A such than A%*%mu is diagonal and subdiagonal of A %*% Del.phi(theta) %*% A'
+    # without adding lambda
+    Ntypes <- length(birth) 
+    alpha <- birth + death + c(tran,0)
+    A1 <- diag(alpha)
+    A2 <- -diag(c(tran,0))
+    for (i in 1:(Ntypes-1)) A1[i+1,i] <- tran[i]
+    rbind(A1,A2)
+  }
+  Ntypes <- length(birth)
+# must improve efficiency
+  L <- Lexp(birth,death,tran)
+  disp(L)
+  Av <- Avec(birth,death,tran)
+  
+# Powers of matrices from 0 to k-1 
+  Lpow <- vector("list",k)
+  Liter <- diag(Ntypes)
+  disp(Liter)
+  for (i in 1:k) {
+    Lpow[[i]] <- Liter
+    Liter <- L %*% Liter
+  }
+  Vcum <- matrix(0,Ntypes,Ntypes)
+  ADA <- matrix(0,Ntypes,Ntypes)
+  diag.pos <- col(ADA) == row(ADA)
+  ldiag.pos <- col(ADA) == (row(ADA)-1)
+  udiag.pos <- col(ADA)-1 == (row(ADA))
+  
+  mu <- Y
+  for ( i in 1:k) {
+    # ADelA' with current mu
+    z <- Av %*% mu
+    z[1] <- z[1] + lambda
+    ADA[diag.pos] <- z[1:Ntypes]
+    subdiag <-  z[(Ntypes+1):(2*Ntypes-1)]
+    ADA[ldiag.pos] <- subdiag
+    ADA[udiag.pos] <- subdiag
+    Vcum <- Vcum + Lpow[[k+1-i]] %*% ADA %*% t(Lpow[[k+1-i]])
+    # next mu
+    mu <- L%*%mu
+    mu[1] <- mu[1] + lambda
+  }
+  list(mu=mu,v=Vcum)
+}
+
+if(FALSE){    
+  Y <- c(100,100,100)
+  parms <- structure(list(lambda = 10, birth = c(0.01, 0.01, 0.01), death = 0.03, 
+                            tran = c(0.01, 0.02)), .Names = c("lambda", "birth", "death", 
+                                                              "tran"))
+  cond_k(1,Y,parms=parms)
+  cond_var(Y, parms = parms)
+  cond_ev(Y, parms = parms)
+  
+  cond_k(10,Y,parms=parms)
+  cond_k(100,Y,parms=parms)
+  cond_k(1000,Y,parms=parms)
+  marg_var(parms=parms)
+  marg_ev(parms=parms)
+}
+  
+# cond_k END --------------------------------  
+
+
 #' Eigenvector of a lower triangular matrix
 #' 
 #' @param A a lower triangular matrix
@@ -292,6 +477,11 @@ var_equation_vec <- function(A,L){
   #' likely to return nonsense otherwise
   N <- dim(A)[1]
   K <- N^2
+  if( any (abs(diag(L)) >= 1)) {
+    cat("\nL matrix has absolute eigenvalue greater than or equal to 1\n")
+    print(L)
+    warning("L matrix problem")
+  }
   v <- solve( diag(K) - kronecker(L,L), c(A))
   matrix(v,N,N)
 }
@@ -354,6 +544,8 @@ marg_var <- function(
     theta[N] <- death[N] - birth[N]
   }
   P <- mean_cond_var(lambda=lambda,birth=birth,death=death,tran=tran)
+  if(verbose) disp(theta)
+  if( any( theta <= 0)) warning("Non-convergent solution due to negative theta")
   if(N == 1) return(P/(2*theta[1] - theta[1]^2))
   L <- diag(1 - theta)
   L[row(L)==(col(L)+1)] <- tran

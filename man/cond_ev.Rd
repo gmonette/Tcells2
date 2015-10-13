@@ -2,9 +2,13 @@
 % Please edit documentation in R/means_variances.R
 \name{cond_ev}
 \alias{cond_ev}
+\alias{cond_ev_k}
 \title{Conditional expectation of next step of process}
 \usage{
 cond_ev(Y, lambda = parms$lambda, birth = parms$birth,
+  death = parms$death, tran = parms$tran, parms, verbose = FALSE)
+
+cond_ev_k(k, Y, lambda = parms$lambda, birth = parms$birth,
   death = parms$death, tran = parms$tran, parms, verbose = FALSE)
 }
 \arguments{
@@ -21,6 +25,8 @@ cond_ev(Y, lambda = parms$lambda, birth = parms$birth,
 \item{parms}{option list with parameters lambda, birth, death and tran}
 
 \item{verbose}{(default FALSE) print additional output for debugging}
+
+\item{k}{number of steps for conditional expectation}
 }
 \value{
 conditional expectation at time t+1
@@ -28,6 +34,10 @@ conditional expectation at time t+1
 \description{
 Conditional expectation of next step of process
 }
+\section{Functions}{
+\itemize{
+\item \code{cond_ev_k}: Conditional expectation in k steps of the process
+}}
 \examples{
 cond_ev(c(100,100,100), 10, .01, .03, c(.01,.02))
 parms <- list(lambda = 10, birth = rep(.01,3),
